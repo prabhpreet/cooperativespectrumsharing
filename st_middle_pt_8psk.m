@@ -1,13 +1,14 @@
 clear;
-close;
+close all;
 
 %%%%%%%%%
 %Pathloss model: d^-n, d is normalized distance
 
 % Let's assume all are collinear. PT---ST---SR----PR
 
+
 d_pt_pr = 10; %in meters!
-d_pt_st = 2;
+d_pt_st = 5;
 d_st_pr = d_pt_pr - d_pt_st;
 d_st_sr = 5;
 
@@ -22,9 +23,9 @@ pt_direct_constellation = [-1 1];
 pt_direct_average_symbol_energy = mean(abs(pt_direct_constellation).^2);
 
 %Relay Phase
-pt_bits = 6;
+pt_bits = 3;
 pt_M = 2.^pt_bits;
-pt_relay_constellation = qammod([0 pt_M-1], pt_M, 0);
+pt_relay_constellation = pskmod([0 pt_M-1], pt_M);
 pt_relay_average_symbol_energy = mean(abs(pt_relay_constellation).^2);
 
 
@@ -100,6 +101,8 @@ for m = 1:length(snr_dB)
 
 		%%%%%%%%%%%%%%%%%%%%%%%%%
 		%Notations
+		
+		%Assumes h remains same for 6 T
 
 		%Y = HX + N (except for STBC, which is Y=XH + N)
 
@@ -136,19 +139,21 @@ for m = 1:length(snr_dB)
 		
 		%%%%%%%%
 		%Relayed System
-		%Phase I: PT, 64QAM since PT near ST (relay).
+		%Phase I: PT, 8PSK * 2 since PT near ST (relay).
 		%%%%%%%%
 
-		pt_symbols = randi([0 pt_M-1], 1,1);
+		pt_symbols = randi([0 pt_M-1], 1,2);
 
 		pt_bit_sequence = de2bi(pt_symbols,pt_bits);
+		
+		pt_bit_sequence = pt_bit_sequence(:)';
 
-		pt_symbols = qammod(pt_symbols, pt_M, 0);
+		pt_symbols = pskmod(pt_symbols, pt_M);
 
 		%At primary reciever
 			pt_pr_h = (randn(1,1)+i*randn(1,1))./sqrt(2);
 
-			pt_pr_n = pt_relay_pr_sigma*((randn(1,1)+i*randn(1,1))./sqrt(2));
+			pt_pr_n = pt_relay_pr_sigma*((randn(1,2)+i*randn(1,2))./sqrt(2));
 
 			pt_pr_y = pt_pr_h*pt_symbols + pt_pr_n;
 			
@@ -158,7 +163,7 @@ for m = 1:length(snr_dB)
 			
 			pt_st_h = (randn(3,1)+i*randn(3,1))./sqrt(2);
 
-			pt_st_n = pt_st_sigma*((randn(3,1)+i*randn(3,1))./sqrt(2));
+			pt_st_n = pt_st_sigma*((randn(3,2)+i*randn(3,2))./sqrt(2));
 
 			pt_st_y = pt_st_h*pt_symbols + pt_st_n;
 			
@@ -171,13 +176,14 @@ for m = 1:length(snr_dB)
 			
 			%%%%%%
 			%Temporary: Assume one recieve antenna only!
-			pt_y_beamformed = pt_st_h(1)'.*pt_st_y(1)./(norm(pt_st_h(1), 'fro').^2);
+			pt_y_beamformed = pt_st_h(1,:)'.*pt_st_y(1,:)./(norm(pt_st_h(1,:), 'fro').^2);
 			%%%%%%
 				
-			pt_st_y_decoded = qamdemod(pt_y_beamformed, pt_M, 0);
+			pt_st_y_decoded = pskdemod(pt_y_beamformed, pt_M);
 			
 			pt_st_y_decoded_bits = de2bi(pt_st_y_decoded,pt_bits);
 			
+			pt_st_y_decoded_bits = pt_st_y_decoded_bits(:)';
 		% %At secondary receiver
 			% pt_sr_h = (randn(1,1)+i*randn(1,1))./sqrt(2);
 
@@ -330,8 +336,10 @@ for m = 1:length(snr_dB)
 		ber_pu_direct(m) = errors_pu_direct/(pt_bits*no_tx_pu)
 		ber_pu_relay(m) = errors_pu_relay/(pt_bits*no_tx_pu)
 		ber_su(m) = errors_su/(6*no_tx_su)
+		
 end
 
+figure
 semilogy(snr_dB, ber_pu_direct, 'r')
 hold on
 semilogy(snr_dB, ber_pu_relay, 'g')
