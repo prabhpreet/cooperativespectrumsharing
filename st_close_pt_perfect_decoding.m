@@ -21,7 +21,7 @@ n = 2; %Free space path loss
 pt_direct_constellation = [-1 1];
 pt_direct_average_symbol_energy = mean(abs(pt_direct_constellation).^2);
 
-%Relay Phase: TODO- check
+%Relay Phase
 pt_bits = 6;
 pt_M = 2.^pt_bits;
 pt_relay_constellation = qammod([0 pt_M-1], pt_M, 0);
@@ -95,7 +95,7 @@ for m = 1:length(snr_dB)
 	st_sr_sigma = sqrt(st_timeslot_energy./(4.*st_sr_snr));
 	%st_sr_sigma = (sqrt([norm(st_stbc_code(1,:),'fro') ;norm(st_stbc_code(2,:),'fro');norm(st_stbc_code(3,:),'fro');norm(st_stbc_code(4,:),'fro')]).^2)./(2.*st_sr_snr);
 
-	while errors_pu_relay < 1000
+	while errors_pu_relay < 50
 	
 
 		%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -143,40 +143,40 @@ for m = 1:length(snr_dB)
 
 		pt_bit_sequence = de2bi(pt_symbols,pt_bits);
 
-		pt_symbols = qammod(pt_symbols, pt_M, 0);
+		% pt_symbols = qammod(pt_symbols, pt_M, 0);
 
-		%At primary reciever
-			pt_pr_h = (randn(1,1)+i*randn(1,1))./sqrt(2);
+		% %At primary reciever
+			% pt_pr_h = (randn(1,1)+i*randn(1,1))./sqrt(2);
 
-			pt_pr_n = pt_relay_pr_sigma*((randn(1,1)+i*randn(1,1))./sqrt(2));
+			% pt_pr_n = pt_relay_pr_sigma*((randn(1,1)+i*randn(1,1))./sqrt(2));
 
-			pt_pr_y = pt_pr_h*pt_symbols + pt_pr_n;
+			% pt_pr_y = pt_pr_h*pt_symbols + pt_pr_n;
 			
-			pt_pr_y = pt_pr_h'*pt_pr_y ./(norm(pt_pr_h, 'fro').^2);
+			% pt_pr_y = pt_pr_h'*pt_pr_y ./(norm(pt_pr_h, 'fro').^2);
 
-		%At secondary transmitter
+		% %At secondary transmitter
 			
-			pt_st_h = (randn(3,1)+i*randn(3,1))./sqrt(2);
+			% pt_st_h = (randn(3,1)+i*randn(3,1))./sqrt(2);
 
-			pt_st_n = pt_st_sigma*((randn(3,1)+i*randn(3,1))./sqrt(2));
+			% pt_st_n = pt_st_sigma*((randn(3,1)+i*randn(3,1))./sqrt(2));
 
-			pt_st_y = pt_st_h*pt_symbols + pt_st_n;
+			% pt_st_y = pt_st_h*pt_symbols + pt_st_n;
 			
-			%%%%%%%
-			%Doubt: Beamforming and channel estimation? Divide channel estimate before beamforming? Is effect of increasing recieve diversity significant after channel estimation techniques?
+			% %%%%%%%
+			% %Doubt: Beamforming and channel estimation? Divide channel estimate before beamforming? Is effect of increasing recieve diversity significant after channel estimation techniques?
 			
-			pt_w = pt_st_h/norm(pt_st_h, 'fro'); %MRC beamformer
+			% pt_w = pt_st_h/norm(pt_st_h, 'fro'); %MRC beamformer
 			
-			%pt_y_beamformed = pt_w' * pt_st_y; %DOUBT!
+			% %pt_y_beamformed = pt_w' * pt_st_y; %DOUBT!
 			
-			%%%%%%
-			%Temporary: Assume one recieve antenna only!
-			pt_y_beamformed = pt_st_h(1)'.*pt_st_y(1)./(norm(pt_st_h(1), 'fro').^2);
-			%%%%%%
+			% %%%%%%
+			% %Temporary: Assume one recieve antenna only!
+			% pt_y_beamformed = pt_st_h(1)'.*pt_st_y(1)./(norm(pt_st_h(1), 'fro').^2);
+			% %%%%%%
 				
-			pt_st_y_decoded = qamdemod(pt_y_beamformed, pt_M, 0);
+			% pt_st_y_decoded = qamdemod(pt_y_beamformed, pt_M, 0);
 			
-			pt_st_y_decoded_bits = de2bi(pt_st_y_decoded,pt_bits);
+			pt_st_y_decoded_bits = pt_bit_sequence;
 			
 		% %At secondary receiver
 			% pt_sr_h = (randn(1,1)+i*randn(1,1))./sqrt(2);
