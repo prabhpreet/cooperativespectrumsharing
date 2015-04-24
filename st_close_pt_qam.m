@@ -2,30 +2,32 @@ clear;
 close;
 
 %%%%%%%%%
-%Pathloss model: d^-n, d is normalized distance
+%Pathloss model
 
 % Let's assume all are collinear. PT---ST---SR----PR
 
-d_pt_pr = 10; %in meters!
-d_pt_st = 0.8;
-d_st_pr = d_pt_pr - d_pt_st;
-d_st_sr = 5;
-
-n = 2; %Free space path loss
-
-
+pl_pt_pr_dB = 0;
+pl_pt_st_dB = 10;
+pl_st_pr_dB = 5;
+pl_st_sr_dB = 10;
 
 %%%%%%%%%
 %Primary Transmitter Setup
 
 pt_direct_constellation = [-1 1];
 pt_direct_average_symbol_energy = mean(abs(pt_direct_constellation).^2);
+pt_direct_constellation = pt_direct_constellation./sqrt(pt_direct_average_symbol_energy);
+pt_direct_average_symbol_energy = mean(abs(pt_direct_constellation).^2);
+
 
 %Relay Phase: TODO- check
 pt_bits = 6;
 pt_M = 2.^pt_bits;
-pt_relay_constellation = qammod([0 pt_M-1], pt_M, 0);
+pt_relay_constellation = qammod([0:pt_M-1], pt_M, 0);
 pt_relay_average_symbol_energy = mean(abs(pt_relay_constellation).^2);
+pt_relay_constellation = pt_relay_constellation./sqrt(pt_relay_average_symbol_energy);
+pt_relay_average_symbol_energy = mean(abs(pt_relay_constellation).^2);
+
 
 
 %%%%%%%%%%%
@@ -35,14 +37,18 @@ rng('default');
 rng('shuffle');
 
 %QPSK symbols
-st_pu_const = (exp(j.*[-3*pi/4 3*pi/4 7*pi/4 -7*pi/4])).*sqrt(2); %Unity magnitude and thus unity power
+st_pu_const = (exp(j.*[-3*pi/4 3*pi/4 7*pi/4 -7*pi/4])); %Unity magnitude and thus unity power
 st_pu_average_symbol_energy = mean(abs(st_pu_const).^2);
+
 
 %scaled QPSK symbols
 st_su_const = st_pu_const./1.6;  %Scaling down the unity amplitude by 1.6
 st_su_average_symbol_energy = mean(abs(st_su_const).^2);
 
-st_timeslot_energy = [3*st_pu_average_symbol_energy; (2*st_pu_average_symbol_energy) + st_su_average_symbol_energy; (2*st_pu_average_symbol_energy) + st_su_average_symbol_energy;(2*st_pu_average_symbol_energy) + st_su_average_symbol_energy];
+e = 4./((9*st_pu_average_symbol_energy) + (3*st_su_average_symbol_energy));
+st_pu_const = st_pu_const.*sqrt(e);
+st_su_const = st_su_const.*sqrt(e);
+
 
 
 %create all combinations of two QPSK symbols
@@ -71,31 +77,28 @@ for m = 1:length(snr_dB)
 	errors_pu_relay = 0;
 	errors_su = 0;
 	
-	pt_direct_pr_snr = snr_dB(m) - (n.*10.*log10(d_pt_pr));
+	pt_direct_pr_snr = snr_dB(m) + pl_pt_pr_dB;
 	pt_direct_pr_snr = 10.^(pt_direct_pr_snr/10);
-	pt_direct_pr_sigma = sqrt(pt_direct_average_symbol_energy/(4.*pt_direct_pr_snr));
+	pt_direct_pr_sigma = sqrt(1/pt_direct_pr_snr);
 	
-	pt_relay_pr_snr = snr_dB(m) - (n.*10.*log10(d_pt_pr));
-	pt_relay_pr_snr = 10.^(pt_relay_pr_snr/10);
-	pt_relay_pr_sigma = sqrt(pt_relay_average_symbol_energy/(4.*pt_relay_pr_snr));
 	
-	pt_st_snr = snr_dB(m) - (n.*10.*log10(d_pt_st));
+	pt_st_snr = snr_dB(m)+ pl_pt_st_dB ;
 	pt_st_snr = 10.^(pt_st_snr/10);
-	pt_st_sigma = sqrt(pt_relay_average_symbol_energy/(4.*pt_st_snr));
+	pt_st_sigma = sqrt(1/pt_st_snr);
 	
 	
-	st_pr_snr = snr_dB(m) - (n.*10.*log10(d_st_pr));
+	st_pr_snr = snr_dB(m) +pl_st_pr_dB;
 	st_pr_snr = 10.^(st_pr_snr/10);
-	st_pr_sigma = sqrt(st_timeslot_energy./(4.*st_pr_snr));
+	st_pr_sigma = sqrt(1/st_pr_snr);
 	%st_pr_sigma = (sqrt([norm(st_stbc_code(1,:),'fro') ;norm(st_stbc_code(2,:),'fro');norm(st_stbc_code(3,:),'fro');norm(st_stbc_code(4,:),'fro')]).^2)./(2.*st_pr_snr);
 	
 	
-	st_sr_snr = snr_dB(m) - (n.*10.*log10(d_st_sr));
+	st_sr_snr = snr_dB(m) + pl_st_sr_dB;
 	st_sr_snr = 10.^(st_sr_snr/10);
-	st_sr_sigma = sqrt(st_timeslot_energy./(4.*st_sr_snr));
+	st_sr_sigma = sqrt(1/st_sr_snr);
 	%st_sr_sigma = (sqrt([norm(st_stbc_code(1,:),'fro') ;norm(st_stbc_code(2,:),'fro');norm(st_stbc_code(3,:),'fro');norm(st_stbc_code(4,:),'fro')]).^2)./(2.*st_sr_snr);
 
-	while errors_pu_relay < 1000
+	while errors_pu_direct < 200
 	
 
 		%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -119,15 +122,15 @@ for m = 1:length(snr_dB)
 		pt_direct_bits = randi([0 1], 1, 6);
 		pt_direct_x = pt_direct_constellation(pt_direct_bits + 1);
 		
-		pt_direct_h = randn(1, 1) + j.*randn(1,1)./sqrt(2);
+		pt_direct_h = randn(1, 6) + j.*randn(1,6)./sqrt(2);
 		
-		pt_direct_n = pt_direct_pr_sigma*((randn(1,1)+i*randn(1,1))./sqrt(2));
+		pt_direct_n = pt_direct_pr_sigma*((randn(1,6)+i*randn(1,6))./sqrt(2));
 		
-		pt_direct_y = pt_direct_h*pt_direct_x  + pt_direct_n;
+		pt_direct_y = pt_direct_h.*pt_direct_x  + pt_direct_n;
 		
 		%Perfect CSI
 		
-		pt_direct_y = pt_direct_h'*pt_direct_y./(norm(pt_direct_h, 'fro').^2);
+		pt_direct_y = conj(pt_direct_h).*pt_direct_y./(abs(pt_direct_h).^2);
 		
 		pt_direct_decoded = (sign(real(pt_direct_y))+1)./2;
 		
@@ -144,15 +147,6 @@ for m = 1:length(snr_dB)
 		pt_bit_sequence = de2bi(pt_symbols,pt_bits);
 
 		pt_symbols = qammod(pt_symbols, pt_M, 0);
-
-		%At primary reciever
-			pt_pr_h = (randn(1,1)+i*randn(1,1))./sqrt(2);
-
-			pt_pr_n = pt_relay_pr_sigma*((randn(1,1)+i*randn(1,1))./sqrt(2));
-
-			pt_pr_y = pt_pr_h*pt_symbols + pt_pr_n;
-			
-			pt_pr_y = pt_pr_h'*pt_pr_y ./(norm(pt_pr_h, 'fro').^2);
 
 		%At secondary transmitter
 			

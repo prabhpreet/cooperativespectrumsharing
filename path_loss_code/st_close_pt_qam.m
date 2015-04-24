@@ -2,31 +2,30 @@ clear;
 close;
 
 %%%%%%%%%
-%Pathloss model
+%Pathloss model: d^-n, d is normalized distance
 
 % Let's assume all are collinear. PT---ST---SR----PR
 
-pl_pt_pr_dB = 0;
-pl_pt_st_dB = 5;
-pl_st_pr_dB = 10;
-pl_st_sr_dB = 0;
+d_pt_pr = 10; %in meters!
+d_pt_st = 0.8;
+d_st_pr = d_pt_pr - d_pt_st;
+d_st_sr = 5;
+
+n = 2; %Free space path loss
+
+
 
 %%%%%%%%%
 %Primary Transmitter Setup
 
 pt_direct_constellation = [-1 1];
 pt_direct_average_symbol_energy = mean(abs(pt_direct_constellation).^2);
-pt_direct_constellation = pt_direct_constellation./sqrt(pt_direct_average_symbol_energy);
-pt_direct_average_symbol_energy = mean(abs(pt_direct_constellation).^2);
 
-%Relay Phase
-pt_bits = 3;
+%Relay Phase: TODO- check
+pt_bits = 6;
 pt_M = 2.^pt_bits;
-pt_relay_constellation = pskmod([0:pt_M-1], pt_M);
+pt_relay_constellation = qammod([0:pt_M-1], pt_M, 0);
 pt_relay_average_symbol_energy = mean(abs(pt_relay_constellation).^2);
-pt_relay_constellation = pt_relay_constellation./sqrt(pt_relay_average_symbol_energy);
-pt_relay_average_symbol_energy = mean(abs(pt_relay_constellation).^2);
-
 
 
 %%%%%%%%%%%
@@ -36,18 +35,14 @@ rng('default');
 rng('shuffle');
 
 %QPSK symbols
-st_pu_const = (exp(j.*[-3*pi/4 3*pi/4 7*pi/4 -7*pi/4])); %Unity magnitude and thus unity power
+st_pu_const = (exp(j.*[-3*pi/4 3*pi/4 7*pi/4 -7*pi/4])).*sqrt(2); %Unity magnitude and thus unity power
 st_pu_average_symbol_energy = mean(abs(st_pu_const).^2);
-
 
 %scaled QPSK symbols
 st_su_const = st_pu_const./1.6;  %Scaling down the unity amplitude by 1.6
 st_su_average_symbol_energy = mean(abs(st_su_const).^2);
 
-e = 4./((9*st_pu_average_symbol_energy) + (3*st_su_average_symbol_energy));
-st_pu_const = st_pu_const.*sqrt(e);
-st_su_const = st_su_const.*sqrt(e);
-
+st_timeslot_energy = [3*st_pu_average_symbol_energy; (2*st_pu_average_symbol_energy) + st_su_average_symbol_energy; (2*st_pu_average_symbol_energy) + st_su_average_symbol_energy;(2*st_pu_average_symbol_energy) + st_su_average_symbol_energy];
 
 
 %create all combinations of two QPSK symbols
@@ -76,25 +71,28 @@ for m = 1:length(snr_dB)
 	errors_pu_relay = 0;
 	errors_su = 0;
 	
-	pt_direct_pr_snr = snr_dB(m) + pl_pt_pr_dB;
+	pt_direct_pr_snr = snr_dB(m) - (n.*10.*log10(d_pt_pr));
 	pt_direct_pr_snr = 10.^(pt_direct_pr_snr/10);
-	pt_direct_pr_sigma = sqrt(1/pt_direct_pr_snr);
+	pt_direct_pr_sigma = sqrt(pt_direct_average_symbol_energy/(4.*pt_direct_pr_snr));
 	
+	pt_relay_pr_snr = snr_dB(m) - (n.*10.*log10(d_pt_pr));
+	pt_relay_pr_snr = 10.^(pt_relay_pr_snr/10);
+	pt_relay_pr_sigma = sqrt(pt_relay_average_symbol_energy/(4.*pt_relay_pr_snr));
 	
-	pt_st_snr = snr_dB(m)+ pl_pt_st_dB ;
+	pt_st_snr = snr_dB(m) - (n.*10.*log10(d_pt_st));
 	pt_st_snr = 10.^(pt_st_snr/10);
-	pt_st_sigma = sqrt(1/pt_st_snr);
+	pt_st_sigma = sqrt(pt_relay_average_symbol_energy/(4.*pt_st_snr));
 	
 	
-	st_pr_snr = snr_dB(m) +pl_st_pr_dB;
+	st_pr_snr = snr_dB(m) - (n.*10.*log10(d_st_pr));
 	st_pr_snr = 10.^(st_pr_snr/10);
-	st_pr_sigma = sqrt(1/st_pr_snr);
+	st_pr_sigma = sqrt(st_timeslot_energy./(4.*st_pr_snr));
 	%st_pr_sigma = (sqrt([norm(st_stbc_code(1,:),'fro') ;norm(st_stbc_code(2,:),'fro');norm(st_stbc_code(3,:),'fro');norm(st_stbc_code(4,:),'fro')]).^2)./(2.*st_pr_snr);
 	
 	
-	st_sr_snr = snr_dB(m) + pl_st_sr_dB;
+	st_sr_snr = snr_dB(m) - (n.*10.*log10(d_st_sr));
 	st_sr_snr = 10.^(st_sr_snr/10);
-	st_sr_sigma = sqrt(1/st_sr_snr);
+	st_sr_sigma = sqrt(st_timeslot_energy./(4.*st_sr_snr));
 	%st_sr_sigma = (sqrt([norm(st_stbc_code(1,:),'fro') ;norm(st_stbc_code(2,:),'fro');norm(st_stbc_code(3,:),'fro');norm(st_stbc_code(4,:),'fro')]).^2)./(2.*st_sr_snr);
 
 	while errors_pu_relay < 200
@@ -102,8 +100,6 @@ for m = 1:length(snr_dB)
 
 		%%%%%%%%%%%%%%%%%%%%%%%%%
 		%Notations
-		
-		%Assumes h remains same for 6 T
 
 		%Y = HX + N (except for STBC, which is Y=XH + N)
 
@@ -119,43 +115,50 @@ for m = 1:length(snr_dB)
 		%BSPK, 6 bits at a time. h constant for whole time interval.
 		%%%%%%%%
 		
-				
+		
 		pt_direct_bits = randi([0 1], 1, 6);
 		pt_direct_x = pt_direct_constellation(pt_direct_bits + 1);
 		
-		pt_direct_h = randn(1, 6) + j.*randn(1,6)./sqrt(2);
+		pt_direct_h = randn(1, 1) + j.*randn(1,1)./sqrt(2);
 		
-		pt_direct_n = pt_direct_pr_sigma*((randn(1,6)+i*randn(1,6))./sqrt(2));
+		pt_direct_n = pt_direct_pr_sigma*((randn(1,1)+i*randn(1,1))./sqrt(2));
 		
-		pt_direct_y = pt_direct_h.*pt_direct_x  + pt_direct_n;
+		pt_direct_y = pt_direct_h*pt_direct_x  + pt_direct_n;
 		
 		%Perfect CSI
 		
-		pt_direct_y = conj(pt_direct_h).*pt_direct_y./(abs(pt_direct_h).^2);
+		pt_direct_y = pt_direct_h'*pt_direct_y./(norm(pt_direct_h, 'fro').^2);
 		
 		pt_direct_decoded = (sign(real(pt_direct_y))+1)./2;
 		
 		errors_pu_direct = errors_pu_direct + sum(pt_direct_bits ~= pt_direct_decoded);
-
+		
+		
 		%%%%%%%%
 		%Relayed System
-		%Phase I: PT, 8PSK * 2 since PT near ST (relay).
+		%Phase I: PT, 64QAM since PT near ST (relay).
 		%%%%%%%%
 
-		pt_symbols = randi([0 pt_M-1], 1,2);
+		pt_symbols = randi([0 pt_M-1], 1,1);
 
 		pt_bit_sequence = de2bi(pt_symbols,pt_bits);
-		
-		pt_bit_sequence = pt_bit_sequence(:)';
 
-		pt_symbols = pskmod(pt_symbols, pt_M);
+		pt_symbols = qammod(pt_symbols, pt_M, 0);
 
+		%At primary reciever
+			pt_pr_h = (randn(1,1)+i*randn(1,1))./sqrt(2);
+
+			pt_pr_n = pt_relay_pr_sigma*((randn(1,1)+i*randn(1,1))./sqrt(2));
+
+			pt_pr_y = pt_pr_h*pt_symbols + pt_pr_n;
+			
+			pt_pr_y = pt_pr_h'*pt_pr_y ./(norm(pt_pr_h, 'fro').^2);
 
 		%At secondary transmitter
 			
 			pt_st_h = (randn(3,1)+i*randn(3,1))./sqrt(2);
 
-			pt_st_n = pt_st_sigma*((randn(3,2)+i*randn(3,2))./sqrt(2));
+			pt_st_n = pt_st_sigma*((randn(3,1)+i*randn(3,1))./sqrt(2));
 
 			pt_st_y = pt_st_h*pt_symbols + pt_st_n;
 			
@@ -168,14 +171,13 @@ for m = 1:length(snr_dB)
 			
 			%%%%%%
 			%Temporary: Assume one recieve antenna only!
-			pt_y_beamformed = pt_st_h(1,:)'.*pt_st_y(1,:)./(norm(pt_st_h(1,:), 'fro').^2);
+			pt_y_beamformed = pt_st_h(1)'.*pt_st_y(1)./(norm(pt_st_h(1), 'fro').^2);
 			%%%%%%
 				
-			pt_st_y_decoded = pskdemod(pt_y_beamformed, pt_M);
+			pt_st_y_decoded = qamdemod(pt_y_beamformed, pt_M, 0);
 			
 			pt_st_y_decoded_bits = de2bi(pt_st_y_decoded,pt_bits);
 			
-			pt_st_y_decoded_bits = pt_st_y_decoded_bits(:)';
 		% %At secondary receiver
 			% pt_sr_h = (randn(1,1)+i*randn(1,1))./sqrt(2);
 
@@ -328,10 +330,8 @@ for m = 1:length(snr_dB)
 		ber_pu_direct(m) = errors_pu_direct/(pt_bits*no_tx_pu)
 		ber_pu_relay(m) = errors_pu_relay/(pt_bits*no_tx_pu)
 		ber_su(m) = errors_su/(6*no_tx_su)
-		
 end
 
-figure
 semilogy(snr_dB, ber_pu_direct, 'r')
 hold on
 semilogy(snr_dB, ber_pu_relay, 'g')
