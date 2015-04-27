@@ -1,18 +1,40 @@
-clear;
-close;
+%% Notations
+%$$Y = HX + N$$
+%(except for STBC, which is $Y=XH + N$)
+%Y: M_r * T
+%H: M_r * M_t
+%X: M_t * T
+%N: M_r * T
 
-%%%%%%%%%
-%Pathloss model
+%% Initialization
 
-% Let's assume all are collinear. PT---ST---SR----PR
+clear all;
+close all;
+
+%Specify extra stings to save .mat file as (leave no spaces)
+version = 'pathLoss';
+
+%% SNR and error parameters
+% Set SNR and errors to be evaulated
+
+errors_evaluated = 200;
+
+snr_dB = -5:5:20;
+
+
+ber_pu_direct = zeros(1,length(snr_dB));
+ber_pu_relay = zeros(1,length(snr_dB));
+ber_su = zeros(1,length(snr_dB));
+
+%% Pathloss Model
+% Taking all pathlosses in dB
 
 pl_pt_pr_dB = 0;
 %pl_pt_st_dB = 10;
-pl_st_pr_dB = 0;
-%pl_st_sr_dB = 10;
+pl_st_pr_dB = 5;
+pl_st_sr_dB = 0;
 
-%%%%%%%%%
-%Primary Transmitter Setup
+%% Primary Transmitter Setup
 
 pt_direct_constellation = [-1 1];
 pt_direct_average_symbol_energy = mean(abs(pt_direct_constellation).^2);
@@ -28,10 +50,7 @@ pt_relay_average_symbol_energy = mean(abs(pt_relay_constellation).^2);
 pt_relay_constellation = pt_relay_constellation./sqrt(pt_relay_average_symbol_energy);
 pt_relay_average_symbol_energy = mean(abs(pt_relay_constellation).^2);
 
-
-
-%%%%%%%%%%%
-%STBC Setup
+%% STBC Setup
 
 rng('default');
 rng('shuffle');
@@ -58,17 +77,9 @@ b=unique([nchoosek(a,3)],'rows');
 X = st_su_const(b((1:length(b)),:));
 
 
-%%%%%%%%%%%
+%% Loop section
+% Set SNR here onwards for loop, when calculating BER
 
-snr_dB = 5:5:30;
-
-
-ber_pu_direct = zeros(1,length(snr_dB));
-ber_pu_relay = zeros(1,length(snr_dB));
-ber_su = zeros(1,length(snr_dB));
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%
-%Set SNR here onwards for loop, when calculating BER
 for m = 1:length(snr_dB)
 
 	no_tx_pu = 0;
@@ -80,26 +91,16 @@ for m = 1:length(snr_dB)
 	pt_direct_pr_snr = snr_dB(m) + pl_pt_pr_dB;
 	pt_direct_pr_snr = 10.^(pt_direct_pr_snr/10);
 	pt_direct_pr_sigma = sqrt(1/pt_direct_pr_snr);
-	
+		
 	st_pr_snr = snr_dB(m) +pl_st_pr_dB;
 	st_pr_snr = 10.^(st_pr_snr/10);
 	st_pr_sigma = sqrt(1/st_pr_snr);
-	
-	
-	while errors_pu_direct < 200
-	
-
-		%%%%%%%%%%%%%%%%%%%%%%%%%
-		%Notations
-
-		%Y = HX + N (except for STBC, which is Y=XH + N)
-
-		%Y: M_r * T
-		%H: M_r * M_t
-		%X: M_t * T
-		%N: M_r * T
-
-		%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+	st_sr_snr = snr_dB(m) +pl_st_sr_dB;
+	st_sr_snr = 10.^(st_sr_snr/10);
+	st_sr_sigma = sqrt(1/st_sr_snr);
+    
+	while errors_pu_direct < errors_evaluated
 
 		%%%%%%%%
 		%Direct Transmission of PU
@@ -160,7 +161,7 @@ for m = 1:length(snr_dB)
 					%Row vectors: Instance of time, T= 4, Column vector: Tx Antennas M_t = 3;
 			
 		%At primary receiver
-			h = (randn(3,1)+i*randn(3,1))./sqrt(2); %Joint variance of complex Gaussian distribution is 1. Therefore, average value of magnitude of fading channel is 1.
+			h = (randn(3,1)+1i*randn(3,1))./sqrt(2); %Joint variance of complex Gaussian distribution is 1. Therefore, average value of magnitude of fading channel is 1.
 				
 			%the following complex equivalent channel matrix is for the ORTHOGONAL 3TX STBC
 			H = [h(1) h(2) h(3); h(2)' -h(1)' 0; h(3)' 0 -h(1)'; 0 h(3)' -h(2)'];
@@ -169,7 +170,7 @@ for m = 1:length(snr_dB)
 			%for 3 TX
 			H_eqv = [h(1) h(2) h(3) 0 0 0; h(2)' -h(1)' 0 h(3)' 0 0; h(3)' 0 -h(1)' 0 h(2)' 0; 0 h(3)' -h(2)' 0 0 h(1)'];
 			
-			N = st_pr_sigma.*((randn(4,1)+i*randn(4,1))./sqrt(2)); 
+			N = st_pr_sigma.*((randn(4,1)+1i*randn(4,1))./sqrt(2)); 
 					% T= 4, M_r = 1
 					%Joint variance of complex Gaussian distribution is 1. Therefore, average value of magnitude of fading channel is 1.
 				
@@ -189,7 +190,7 @@ for m = 1:length(snr_dB)
 					
 					Sym = sign([real(Y_match); imag(Y_match)]);
 				
-					S_tilde = Sym(1:3) + i*Sym(4:6);
+					S_tilde = Sym(1:3) + 1i*Sym(4:6);
 					
 					Decoded_Symb{k} = [S_tilde.' X(k,1) X(k,2) X(k,3)];
 					%Now apply ML decoding using the overall equivalent channel matrix
@@ -208,24 +209,42 @@ for m = 1:length(snr_dB)
 				
 				st_pr_decoded_bits = reshape([(sign(imag(st_pr_decoded_symbols))+1)/2;(sign(real(st_pr_decoded_symbols))+1)/2].', 1,6);
 				
-				pr_recieved=bi2de(st_pr_decoded_bits);
-				
 				errors_pu_relay = errors_pu_relay + sum(pt_bit_sequence ~= st_pr_decoded_bits);
 
 				no_tx_pu = no_tx_pu + 1;
 				
-		end
+        % At secondary reciever
+            st_sr_h = (randn(3,1)+1i*randn(3,1))./sqrt(2);
+            st_sr_n = st_sr_sigma.*((randn(4,1)+1i*randn(4,1))./sqrt(2));
+            
+            st_sr_Y = st_stbc_code * st_sr_h + st_sr_n;
+            
+            %%%%%%%%%%%%%%%
+            % Assume that we know all 6 bits of primary transmitter
+            % perfectly.
+            %%%%%%%%%%%%%%%      
+            
+            st_sr_Y_dash = st_sr_Y(2:4);
+            H_dash = [-st_sr_h(2) st_sr_h(1) 0;-st_sr_h(3) 0 st_sr_h(1); 0 -st_sr_h(3) st_sr_h(2)];
+            H_prime = [st_sr_h(3)'./(abs(st_sr_h(3)).^2);st_sr_h(2)'./(abs(st_sr_h(2)).^2);st_sr_h(1)'./(abs(st_sr_h(1)).^2)];
+            
+            s_prime = (H_prime.*(st_sr_Y_dash + H_dash*(c')))';
+            
+            st_sr_decoded_bits = [(sign(imag(s_prime))+1)/2;(sign(real(s_prime))+1)/2].';
+
+            
+            errors_su = errors_su + sum(st_bit_sequence(:) ~= st_sr_decoded_bits(:));
+            
+            no_tx_su = no_tx_su + 1;
+            
+    end
 		
 		snr_dB(m)
 		ber_pu_direct(m) = errors_pu_direct/(pt_bits*no_tx_pu)
 		ber_pu_relay(m) = errors_pu_relay/(pt_bits*no_tx_pu)
-		%ber_su(m) = errors_su/(6*no_tx_su)
+		ber_su(m) = errors_su/(6*no_tx_su)
 end
 
-semilogy(snr_dB, ber_pu_direct, 'r')
-hold on
-semilogy(snr_dB, ber_pu_relay, 'g')
-hold on
-%semilogy(snr_dB, ber_su)
-legend('BPSK Primary System', 'Relayed Primary System');
-grid on;
+%% Save Data
+
+save(strcat('values_', num2str(snr_dB(1)), '_' , num2str(snr_dB(end)), 'dB','_',num2str(errors_evaluated),'iterations', version,'.mat'));

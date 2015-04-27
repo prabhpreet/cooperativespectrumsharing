@@ -1,3 +1,5 @@
+function [st_sr_sigma, st_sr_snr] = testing(m)
+
 %% Notations
 %$$Y = HX + N$$
 %(except for STBC, which is $Y=XH + N$)
@@ -6,20 +8,9 @@
 %X: M_t * T
 %N: M_r * T
 
-%% Initialization
-
-clear all;
-close all;
-
-%Specify extra stings to save .mat file as (leave no spaces)
-version = 'pathLoss';
-
-%% SNR and error parameters
-% Set SNR and errors to be evaulated
-
 errors_evaluated = 2000;
 
-snr_dB = -5:5:20;
+snr_dB = -5:5:30;
 
 
 ber_pu_direct = zeros(1,length(snr_dB));
@@ -31,7 +22,7 @@ ber_su = zeros(1,length(snr_dB));
 
 pl_pt_pr_dB = 0;
 %pl_pt_st_dB = 10;
-pl_st_pr_dB = 5;
+pl_st_pr_dB = 0;
 pl_st_sr_dB = 0;
 
 %% Primary Transmitter Setup
@@ -80,7 +71,6 @@ X = st_su_const(b((1:length(b)),:));
 %% Loop section
 % Set SNR here onwards for loop, when calculating BER
 
-for m = 1:length(snr_dB)
 
 	no_tx_pu = 0;
 	no_tx_su = 0;
@@ -91,7 +81,12 @@ for m = 1:length(snr_dB)
 	pt_direct_pr_snr = snr_dB(m) + pl_pt_pr_dB;
 	pt_direct_pr_snr = 10.^(pt_direct_pr_snr/10);
 	pt_direct_pr_sigma = sqrt(1/pt_direct_pr_snr);
-		
+	
+	st_pr_snr = snr_dB(m) +pl_st_pr_dB;
+	st_pr_snr = 10.^(st_pr_snr/10);
+	st_pr_sigma = sqrt(1/st_pr_snr);
+	
+	
 	st_pr_snr = snr_dB(m) +pl_st_pr_dB;
 	st_pr_snr = 10.^(st_pr_snr/10);
 	st_pr_sigma = sqrt(1/st_pr_snr);
@@ -100,38 +95,7 @@ for m = 1:length(snr_dB)
 	st_sr_snr = 10.^(st_sr_snr/10);
 	st_sr_sigma = sqrt(1/st_sr_snr);
     
-	while errors_pu_direct < errors_evaluated
-
-		%%%%%%%%
-		%Direct Transmission of PU
-		%BSPK, 6 bits at a time. h constant for whole time interval.
-		%%%%%%%%
-		
-		
-		pt_direct_bits = randi([0 1], 1, 6);
-		pt_direct_x = pt_direct_constellation(pt_direct_bits + 1);
-		
-		pt_direct_h = randn(1, 6) + j.*randn(1,6)./sqrt(2);
-		
-		pt_direct_n = pt_direct_pr_sigma*((randn(1,6)+i*randn(1,6))./sqrt(2));
-		
-		pt_direct_y = pt_direct_h.*pt_direct_x  + pt_direct_n;
-		
-		%Perfect CSI
-		
-		pt_direct_y = conj(pt_direct_h).*pt_direct_y./(abs(pt_direct_h).^2);
-		
-		pt_direct_decoded = (sign(real(pt_direct_y))+1)./2;
-		
-		errors_pu_direct = errors_pu_direct + sum(pt_direct_bits ~= pt_direct_decoded);
-		
-		
-		%%%%%%%%
-		%Relayed System
-		%Phase I: Assume perfect decoding.
-		%%%%%%%%
-
-		pt_symbols = randi([0 pt_M-1], 1,1);
+pt_symbols = randi([0 pt_M-1], 1,1);
 
 		pt_bit_sequence = de2bi(pt_symbols,pt_bits);
 
@@ -141,15 +105,10 @@ for m = 1:length(snr_dB)
 			
 		pt_st_y_decoded_bits = de2bi(pt_st_y_decoded,pt_bits);
 		
-		%%%%%%%%
-		%Phase II: ST, STBC Code
-		%%%%%%%%
-
-		%At secondary transmitter
-
-			st_symbols = randi([1,4], 3, 1);
-			st_bit_sequence = de2bi(st_symbols-1, 2);
-			st_symbols = st_su_const(st_symbols);
+        
+st_symbols = randi([1,4], 3, 1);
+			st_bit_sequence = de2bi(st_symbols-1, 2)
+			st_symbols = st_su_const(st_symbols)
 
 			
 			c = st_pu_const(bi2de(reshape(pt_st_y_decoded_bits, 3, 2)) + ones(3,1));
@@ -228,23 +187,19 @@ for m = 1:length(snr_dB)
             H_dash = [-st_sr_h(2) st_sr_h(1) 0;-st_sr_h(3) 0 st_sr_h(1); 0 -st_sr_h(3) st_sr_h(2)];
             H_prime = [st_sr_h(3)'./(abs(st_sr_h(3)).^2);st_sr_h(2)'./(abs(st_sr_h(2)).^2);st_sr_h(1)'./(abs(st_sr_h(1)).^2)];
             
-            s_prime = (H_prime.*(st_sr_Y_dash + H_dash*(c')))';
+            s_prime = (H_prime.*(st_sr_Y_dash - H_dash*s.'))'
             
-            st_sr_decoded_bits = [(sign(imag(s_prime))+1)/2;(sign(real(s_prime))+1)/2].';
+            st_sr_decoded_bits = [(sign(imag(s_prime))+1)/2;(sign(real(s_prime))+1)/2].'
 
             
-            errors_su = errors_su + sum(st_bit_sequence(:) ~= st_sr_decoded_bits(:));
+            errors_su = errors_su + sum(st_bit_sequence(:) ~= st_sr_decoded_bits(:))
             
             no_tx_su = no_tx_su + 1;
+        
+figure
+plot(st_su_const(1:4),'bo');
+hold on
+plot(st_symbols, 'g.')
+hold on
+plot(s_prime,'rX')
             
-    end
-		
-		snr_dB(m)
-		ber_pu_direct(m) = errors_pu_direct/(pt_bits*no_tx_pu)
-		ber_pu_relay(m) = errors_pu_relay/(pt_bits*no_tx_pu)
-		ber_su(m) = errors_su/(6*no_tx_su)
-end
-
-%% Save Data
-
-save(strcat('values_', num2str(snr_dB(1)), '_' , num2str(snr_dB(end)), 'dB','_',num2str(errors_evaluated),'iterations', version,'.mat'));
