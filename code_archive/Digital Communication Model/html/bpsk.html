@@ -1,0 +1,257 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>bpsk</title><meta name="generator" content="MATLAB 8.1"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2015-02-23"><meta name="DC.source" content="bpsk.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, tt, code { font-size:12px; }
+pre { margin:0px 0px 20px; }
+pre.error { color:red; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><pre class="codeinput"><span class="comment">%Information source</span>
+    sample_size = 100;
+    bit_sequence = randi([0 1], [1 sample_size]);
+
+<span class="comment">%Source encoder: Express information source in minimum possible bits</span>
+
+    source_encoded_sequence = bit_sequence;
+
+<span class="comment">%Channel encoder: Binary data to code words with added error protection</span>
+
+    word_length = 1;
+
+    constellation = exp(1i*2*pi*(0:(2.^(word_length)-1))/(2.^word_length));
+
+    constellation_elements = length(constellation);
+
+    source_encoded_sequence = [source_encoded_sequence, zeros(1, mod(sample_size, word_length))]; <span class="comment">%Pad zeros at end of odd sequence.</span>
+
+    words = reshape(source_encoded_sequence, word_length, [])';
+
+    <span class="comment">%Mapping scheme</span>
+    symbols = bi2de(words); <span class="comment">%Binary mapping</span>
+
+
+<span class="comment">%Modulation</span>
+
+    bit_rate = 1000; <span class="comment">%bits per second</span>
+    symbol_rate = bit_rate/word_length;
+    samples_per_symbol = 100; <span class="comment">%Integer value, for simplicity</span>
+    sampling_rate = samples_per_symbol*symbol_rate; <span class="comment">%Hz</span>
+
+    t = 0:(1/sampling_rate):(length(words)/symbol_rate)- (1/sampling_rate);
+
+    <span class="comment">%Pulse signal</span>
+        pulse_t = [ones(1,samples_per_symbol), zeros(1, length(t)-samples_per_symbol)]; <span class="comment">%Function of t though, impulse here</span>
+
+        modulated_baseband = zeros(1, length(t));
+
+        <span class="keyword">for</span> i = 1:length(t) <span class="comment">%Code assumes integer value of samples per symbol</span>
+            last_element = mod(i, samples_per_symbol);
+            <span class="keyword">if</span> last_element == 0
+                last_element = samples_per_symbol;
+            <span class="keyword">end</span>;
+            pulse_sequence = pulse_t(i:-samples_per_symbol:last_element);
+            modulation_coefficients = constellation(symbols + 1);
+            modulated_baseband(i) = sum(modulation_coefficients(1:length(pulse_sequence)).*pulse_sequence);
+        <span class="keyword">end</span>
+
+    <span class="comment">%Frequency conversion</span>
+    f_c = 0;
+    modulated_signal = 2.*real(modulated_baseband.*exp(1i*2*pi*f_c*t));
+    figure, plot(t,modulated_signal);
+
+<span class="comment">%Channel</span>
+
+    <span class="comment">%Adding AWGN</span>
+    EbNo = 5;
+
+    snr = EbNo + 10*log10(word_length) - 10*log10(samples_per_symbol);
+
+    recieved_signal = awgn(modulated_baseband, snr, <span class="string">'measured'</span>);
+
+<span class="comment">%Demodulator</span>
+
+    <span class="comment">%Demodulation</span>
+
+        <span class="comment">%Frequency downconversion</span>
+            <span class="comment">%Bandpass filter, etc.</span>
+
+        <span class="comment">%Reciever filter</span>
+
+
+        <span class="comment">%Equalizer</span>
+
+
+        <span class="comment">%Averaging of many samples taken</span>
+        recieved_symbols = zeros(length(words), 1);
+        <span class="keyword">for</span> i = 1:length(words)
+            recieved_symbols(i,1) = sum(recieved_signal((((i-1)*samples_per_symbol) + 1):i*samples_per_symbol))./samples_per_symbol;
+        <span class="keyword">end</span>
+
+
+        <span class="comment">%Constellation diagram</span>
+            constellation_diagram = scatterplot(recieved_symbols, 1, 0, <span class="string">'g.'</span>);
+            hold <span class="string">on</span>
+            scatterplot(modulated_baseband, 1, 0, <span class="string">'k*'</span>, constellation_diagram);
+
+
+    <span class="comment">%Detection</span>
+
+<span class="comment">%Channel Decoder</span>
+
+<span class="comment">%Source Decoder</span>
+</pre><img vspace="5" hspace="5" src="bpsk_01.png" alt=""> <img vspace="5" hspace="5" src="bpsk_02.png" alt=""> <p class="footer"><br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2013a</a><br></p></div><!--
+##### SOURCE BEGIN #####
+%Information source
+    sample_size = 100;
+    bit_sequence = randi([0 1], [1 sample_size]);
+
+%Source encoder: Express information source in minimum possible bits
+
+    source_encoded_sequence = bit_sequence;
+
+%Channel encoder: Binary data to code words with added error protection
+
+    word_length = 1;
+    
+    constellation = exp(1i*2*pi*(0:(2.^(word_length)-1))/(2.^word_length));
+
+    constellation_elements = length(constellation);
+
+    source_encoded_sequence = [source_encoded_sequence, zeros(1, mod(sample_size, word_length))]; %Pad zeros at end of odd sequence.
+
+    words = reshape(source_encoded_sequence, word_length, [])';
+
+    %Mapping scheme
+    symbols = bi2de(words); %Binary mapping
+
+
+%Modulation
+
+    bit_rate = 1000; %bits per second
+    symbol_rate = bit_rate/word_length;
+    samples_per_symbol = 100; %Integer value, for simplicity
+    sampling_rate = samples_per_symbol*symbol_rate; %Hz
+
+    t = 0:(1/sampling_rate):(length(words)/symbol_rate)- (1/sampling_rate);
+
+    %Pulse signal
+        pulse_t = [ones(1,samples_per_symbol), zeros(1, length(t)-samples_per_symbol)]; %Function of t though, impulse here
+
+        modulated_baseband = zeros(1, length(t));
+
+        for i = 1:length(t) %Code assumes integer value of samples per symbol
+            last_element = mod(i, samples_per_symbol);
+            if last_element == 0
+                last_element = samples_per_symbol;
+            end;
+            pulse_sequence = pulse_t(i:-samples_per_symbol:last_element);
+            modulation_coefficients = constellation(symbols + 1);
+            modulated_baseband(i) = sum(modulation_coefficients(1:length(pulse_sequence)).*pulse_sequence);
+        end
+
+    %Frequency conversion
+    f_c = 0;
+    modulated_signal = 2.*real(modulated_baseband.*exp(1i*2*pi*f_c*t));
+    figure, plot(t,modulated_signal);
+    
+%Channel
+
+    %Adding AWGN
+    EbNo = 5;
+
+    snr = EbNo + 10*log10(word_length) - 10*log10(samples_per_symbol);
+
+    recieved_signal = awgn(modulated_baseband, snr, 'measured');
+
+%Demodulator
+
+    %Demodulation
+        
+        %Frequency downconversion
+            %Bandpass filter, etc.
+        
+        %Reciever filter
+            
+        
+        %Equalizer
+        
+        
+        %Averaging of many samples taken
+        recieved_symbols = zeros(length(words), 1);
+        for i = 1:length(words)
+            recieved_symbols(i,1) = sum(recieved_signal((((i-1)*samples_per_symbol) + 1):i*samples_per_symbol))./samples_per_symbol;
+        end
+        
+        
+        %Constellation diagram
+            constellation_diagram = scatterplot(recieved_symbols, 1, 0, 'g.');
+            hold on
+            scatterplot(modulated_baseband, 1, 0, 'k*', constellation_diagram);
+
+
+    %Detection
+
+%Channel Decoder
+
+%Source Decoder
+##### SOURCE END #####
+--></body></html>

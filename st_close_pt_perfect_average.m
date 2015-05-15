@@ -12,14 +12,14 @@ clear all;
 close all;
 
 %Specify extra stings to save .mat file as (leave no spaces)
-version = 'pathLoss';
+version = 'pathLoss_perfect_average';
 
 %% SNR and error parameters
 % Set SNR and errors to be evaulated
 
 errors_evaluated = 2000;
 
-snr_dB = -5:5:20;
+snr_dB = 30;
 
 
 ber_pu_direct = zeros(1,length(snr_dB));
@@ -56,7 +56,7 @@ rng('default');
 rng('shuffle');
 
 %QPSK symbols
-st_pu_const = (exp(j.*[-3*pi/4 3*pi/4 7*pi/4 -7*pi/4])); %Unity magnitude and thus unity power
+st_pu_const = (exp(1i.*[-3*pi/4 3*pi/4 7*pi/4 -7*pi/4])); %Unity magnitude and thus unity power
 st_pu_average_symbol_energy = mean(abs(st_pu_const).^2);
 
 
@@ -111,9 +111,9 @@ for m = 1:length(snr_dB)
 		pt_direct_bits = randi([0 1], 1, 6);
 		pt_direct_x = pt_direct_constellation(pt_direct_bits + 1);
 		
-		pt_direct_h = randn(1, 6) + j.*randn(1,6)./sqrt(2);
+		pt_direct_h = randn(1, 6) + 1i.*randn(1,6)./sqrt(2);
 		
-		pt_direct_n = pt_direct_pr_sigma*((randn(1,6)+i*randn(1,6))./sqrt(2));
+		pt_direct_n = pt_direct_pr_sigma*((randn(1,6)+1i*randn(1,6))./sqrt(2));
 		
 		pt_direct_y = pt_direct_h.*pt_direct_x  + pt_direct_n;
 		

@@ -1,0 +1,10 @@
+* Unity bandwidth assumed in noise simulation
+http://www.gaussianwaves.com/2008/11/relation-between-ebn0-and-snr-2/
+
+	How would we define bandwidth for QAM?
+	
+* Linear modulation vs. Non linear modulation
+
+* Representing matched filter as a digital filter, in terms of baseband modulation
+
+* Representing orthogonal signals in baseband.
