@@ -19,7 +19,7 @@ version = 'pathLossNorm';
 
 errors_evaluated = 2000;
 
-snr_dB = 30;
+snr_dB = -5:5:30;
 
 
 ber_pu_direct = zeros(1,length(snr_dB));
